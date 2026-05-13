@@ -472,7 +472,7 @@ def recommendation_for(label: str, confidence: float) -> str:
     )
 
 
-def render_header(df: pd.DataFrame, bundle: ModelBundle) -> None:
+def render_overview(df: pd.DataFrame, bundle: ModelBundle) -> None:
     st.markdown(
         """
         <div class="hero">
@@ -568,7 +568,7 @@ def render_dashboard(df: pd.DataFrame, bundle: ModelBundle) -> None:
 
 
 def render_prediction_form(df: pd.DataFrame, bundle: ModelBundle) -> None:
-    st.subheader("New Patient CTG Assessment")
+    st.title("New Patient Assessment")
     st.caption(
         "Enter CTG-derived values from the patient record. Every field shows the dataset column name, "
         "allowed range, and median default."
@@ -680,7 +680,7 @@ def render_prediction_form(df: pd.DataFrame, bundle: ModelBundle) -> None:
 
 
 def render_model_details(bundle: ModelBundle) -> None:
-    st.subheader("Model Training And Evaluation")
+    st.subheader("Model Evaluation")
     st.caption("This tab is for explaining how the model was trained and how it performed.")
     metric_col_1, metric_col_2 = st.columns(2)
     metric_col_1.metric("Test accuracy", f"{bundle.test_accuracy:.1%}")
@@ -720,14 +720,13 @@ def main() -> None:
         for class_id, label in CLASS_LABELS.items():
             st.markdown(f"- `{class_id}` {label}")
 
-    render_header(df, bundle)
-
     assessment_tab, analytics_tab, model_tab = st.tabs(
-        ["New Assessment", "Dataset Analytics", "Model Training"]
+        ["New Assessment", "Data Analytics", "Model Evaluation"]
     )
     with assessment_tab:
         render_prediction_form(df, bundle)
     with analytics_tab:
+        render_overview(df, bundle)
         render_dashboard(df, bundle)
     with model_tab:
         render_model_details(bundle)
