@@ -57,7 +57,7 @@ FEATURE_DESCRIPTIONS = {
 }
 
 FEATURE_GUIDANCE = {
-    "baseline value": "Enter the average fetal heart rate in beats per minute.",
+    "baseline value": "Enter the average fetal heart rate in beats per minute. A baseline around 110-160 bpm is generally considered normal.",
     "accelerations": "Enter how often the fetal heart rate rises above baseline.",
     "fetal_movement": "Enter the detected fetal movement frequency from the CTG record.",
     "uterine_contractions": "Enter the contraction frequency recorded during monitoring.",
@@ -78,6 +78,11 @@ FEATURE_GUIDANCE = {
     "histogram_median": "Enter the middle fetal heart-rate histogram value.",
     "histogram_variance": "Enter how spread out the fetal heart-rate values are.",
     "histogram_tendency": "Enter the histogram tendency value: -1, 0, or 1.",
+}
+
+CLINICAL_INPUT_BOUNDS = {
+    # Baseline fetal heart rate can be clinically meaningful outside the dataset range.
+    "baseline value": (80.0, 220.0),
 }
 
 
@@ -369,18 +374,21 @@ def format_value(value: float) -> str:
 
 
 def numeric_input_for_feature(df: pd.DataFrame, feature: str) -> float:
-    low, high, median = feature_bounds(df, feature)
+    train_low, train_high, median = feature_bounds(df, feature)
+    input_low, input_high = CLINICAL_INPUT_BOUNDS.get(feature, (train_low, train_high))
     description = FEATURE_DESCRIPTIONS.get(feature, feature.replace("_", " ").title())
     guidance = FEATURE_GUIDANCE.get(feature, "Enter the value from the CTG record.")
     is_integer = np.all(np.isclose(df[feature], df[feature].round()))
     step = 1.0 if is_integer else 0.001
+    range_label = "clinical input range" if feature in CLINICAL_INPUT_BOUNDS else "allowed range"
     st.markdown(
         f"""
         <div class="field-label">
             <strong>{description}</strong>
             <span>{guidance}</span>
-            <span>Column: <code>{feature}</code> | allowed range:
-            {format_value(low)} to {format_value(high)} | usual median:
+            <span>Column: <code>{feature}</code> | {range_label}:
+            {format_value(input_low)} to {format_value(input_high)} | training data:
+            {format_value(train_low)} to {format_value(train_high)} | usual median:
             {format_value(median)}</span>
         </div>
         """,
@@ -388,26 +396,33 @@ def numeric_input_for_feature(df: pd.DataFrame, feature: str) -> float:
     )
     value = st.number_input(
         description,
-        min_value=low,
-        max_value=high,
+        min_value=input_low,
+        max_value=input_high,
         value=median,
         step=step,
         label_visibility="collapsed",
         help=(
-            f"Allowed range from the training dataset: "
-            f"{format_value(low)} to {format_value(high)}. "
+            f"Training dataset range: "
+            f"{format_value(train_low)} to {format_value(train_high)}. "
             f"Default value is the dataset median: {format_value(median)}."
         ),
     )
     st.markdown(
         f"""
         <div class="field-range">
-            Allowed range: <strong>{format_value(low)}</strong> to
-            <strong>{format_value(high)}</strong> | median: {format_value(median)}
+            Input range: <strong>{format_value(input_low)}</strong> to
+            <strong>{format_value(input_high)}</strong> | training range:
+            {format_value(train_low)} to {format_value(train_high)}
         </div>
         """,
         unsafe_allow_html=True,
     )
+    if value < train_low or value > train_high:
+        st.warning(
+            "This value is outside the training dataset range. The app will still predict, "
+            "but the result is less reliable because the model learned mostly from values "
+            f"between {format_value(train_low)} and {format_value(train_high)}."
+        )
     return float(value)
 
 
