@@ -72,7 +72,7 @@ st.set_page_config(
     page_title="Fetal Health Classifier",
     page_icon="FH",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 
@@ -203,6 +203,12 @@ def inject_styles() -> None:
             border-color: #115e59;
         }
 
+        .field-range {
+            color: var(--muted);
+            font-size: .78rem;
+            margin: -.55rem 0 .7rem;
+        }
+
         @media (max-width: 900px) {
             .metric-strip {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -285,9 +291,16 @@ def feature_bounds(df: pd.DataFrame, feature: str) -> tuple[float, float, float]
     return low, high, median
 
 
+def format_value(value: float) -> str:
+    if abs(value) >= 10:
+        return f"{value:.0f}"
+    return f"{value:.3f}".rstrip("0").rstrip(".")
+
+
 def numeric_input_for_feature(df: pd.DataFrame, feature: str) -> float:
     low, high, median = feature_bounds(df, feature)
-    label = FEATURE_DESCRIPTIONS.get(feature, feature.replace("_", " ").title())
+    description = FEATURE_DESCRIPTIONS.get(feature, feature.replace("_", " ").title())
+    label = f"{description} | dataset column: {feature}"
     is_integer = np.all(np.isclose(df[feature], df[feature].round()))
     step = 1.0 if is_integer else 0.001
     value = st.number_input(
@@ -296,7 +309,20 @@ def numeric_input_for_feature(df: pd.DataFrame, feature: str) -> float:
         max_value=high,
         value=median,
         step=step,
-        help=f"Dataset field: {feature}. Observed range: {low:g} to {high:g}.",
+        help=(
+            f"Allowed range from the training dataset: "
+            f"{format_value(low)} to {format_value(high)}. "
+            f"Default value is the dataset median: {format_value(median)}."
+        ),
+    )
+    st.markdown(
+        f"""
+        <div class="field-range">
+            Allowed range: <strong>{format_value(low)}</strong> to
+            <strong>{format_value(high)}</strong> | median: {format_value(median)}
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
     return float(value)
 
@@ -408,6 +434,8 @@ def render_header(df: pd.DataFrame, bundle: ModelBundle) -> None:
 
 
 def render_dashboard(df: pd.DataFrame, bundle: ModelBundle) -> None:
+    st.subheader("Dataset Analytics")
+    st.caption("These charts explain the public CTG dataset and what the trained model learned.")
     left, right = st.columns([1.1, 1])
 
     with left:
@@ -456,8 +484,11 @@ def render_dashboard(df: pd.DataFrame, bundle: ModelBundle) -> None:
 
 
 def render_prediction_form(df: pd.DataFrame, bundle: ModelBundle) -> None:
-    st.subheader("Patient CTG Assessment")
-    st.caption("Enter CTG-derived values. Defaults are dataset medians for a realistic starting case.")
+    st.subheader("New Patient CTG Assessment")
+    st.caption(
+        "Enter CTG-derived values from the patient record. Every field shows the dataset column name, "
+        "allowed range, and median default."
+    )
 
     with st.form("ctg_assessment_form"):
         tab_core, tab_variability, tab_histogram = st.tabs(
@@ -565,9 +596,19 @@ def render_prediction_form(df: pd.DataFrame, bundle: ModelBundle) -> None:
 
 
 def render_model_details(bundle: ModelBundle) -> None:
-    with st.expander("Model evaluation details"):
-        st.write(f"Accuracy: `{bundle.test_accuracy:.3f}`")
-        st.write(f"Balanced accuracy: `{bundle.balanced_accuracy:.3f}`")
+    st.subheader("Model Training And Evaluation")
+    st.caption("This tab is for explaining how the model was trained and how it performed.")
+    metric_col_1, metric_col_2 = st.columns(2)
+    metric_col_1.metric("Test accuracy", f"{bundle.test_accuracy:.1%}")
+    metric_col_2.metric("Balanced accuracy", f"{bundle.balanced_accuracy:.1%}")
+
+    st.markdown(
+        """
+        The model is a Random Forest classifier trained on CTG records. The dataset is split into
+        training data and unseen test data, then the test set is used to estimate performance.
+        """
+    )
+    with st.expander("Full classification report"):
         st.code(bundle.report, language="text")
 
 
@@ -585,6 +626,7 @@ def main() -> None:
             Built for a Biomedical Data Analytics final project.
             """
         )
+        st.caption("Use the sidebar arrow in the top-left corner to open or close this panel.")
         st.divider()
         st.markdown("**Dataset source**")
         st.link_button("UCI CTG Dataset", "https://archive.ics.uci.edu/dataset/193/cardiotocography")
@@ -595,10 +637,16 @@ def main() -> None:
             st.markdown(f"- `{class_id}` {label}")
 
     render_header(df, bundle)
-    render_dashboard(df, bundle)
-    st.divider()
-    render_prediction_form(df, bundle)
-    render_model_details(bundle)
+
+    assessment_tab, analytics_tab, model_tab = st.tabs(
+        ["New Assessment", "Dataset Analytics", "Model Training"]
+    )
+    with assessment_tab:
+        render_prediction_form(df, bundle)
+    with analytics_tab:
+        render_dashboard(df, bundle)
+    with model_tab:
+        render_model_details(bundle)
 
 
 if __name__ == "__main__":
