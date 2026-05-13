@@ -56,6 +56,30 @@ FEATURE_DESCRIPTIONS = {
     "histogram_tendency": "FHR histogram tendency",
 }
 
+FEATURE_GUIDANCE = {
+    "baseline value": "Enter the average fetal heart rate in beats per minute.",
+    "accelerations": "Enter how often the fetal heart rate rises above baseline.",
+    "fetal_movement": "Enter the detected fetal movement frequency from the CTG record.",
+    "uterine_contractions": "Enter the contraction frequency recorded during monitoring.",
+    "light_decelerations": "Enter small temporary drops in fetal heart rate.",
+    "severe_decelerations": "Enter severe temporary drops in fetal heart rate.",
+    "prolongued_decelerations": "Enter long-lasting drops in fetal heart rate.",
+    "abnormal_short_term_variability": "Enter the percentage of time with abnormal short-term heart-rate variability.",
+    "mean_value_of_short_term_variability": "Enter the average short-term variability value.",
+    "percentage_of_time_with_abnormal_long_term_variability": "Enter the percentage of time with abnormal long-term variability.",
+    "mean_value_of_long_term_variability": "Enter the average long-term variability value.",
+    "histogram_width": "Enter the width of the fetal heart-rate histogram.",
+    "histogram_min": "Enter the minimum fetal heart-rate value in the histogram.",
+    "histogram_max": "Enter the maximum fetal heart-rate value in the histogram.",
+    "histogram_number_of_peaks": "Enter the number of peaks in the fetal heart-rate histogram.",
+    "histogram_number_of_zeroes": "Enter the number of zero values in the fetal heart-rate histogram.",
+    "histogram_mode": "Enter the most frequent fetal heart-rate value.",
+    "histogram_mean": "Enter the average fetal heart-rate histogram value.",
+    "histogram_median": "Enter the middle fetal heart-rate histogram value.",
+    "histogram_variance": "Enter how spread out the fetal heart-rate values are.",
+    "histogram_tendency": "Enter the histogram tendency value: -1, 0, or 1.",
+}
+
 
 @dataclass(frozen=True)
 class ModelBundle:
@@ -97,6 +121,31 @@ def inject_styles() -> None:
         [data-testid="stSidebar"] {
             background: #ffffff;
             border-right: 1px solid var(--line);
+        }
+
+        h1, h2, h3, h4, h5, h6, p, span, label, div {
+            color: var(--ink);
+        }
+
+        button[data-baseweb="tab"] p,
+        button[data-baseweb="tab"] div,
+        button[data-baseweb="tab"] span {
+            color: var(--ink) !important;
+            opacity: 1 !important;
+            font-weight: 650;
+        }
+
+        button[data-baseweb="tab"][aria-selected="true"] p,
+        button[data-baseweb="tab"][aria-selected="true"] div,
+        button[data-baseweb="tab"][aria-selected="true"] span {
+            color: var(--accent) !important;
+        }
+
+        div[data-testid="stNumberInput"] label,
+        div[data-testid="stNumberInput"] label p {
+            color: var(--ink) !important;
+            opacity: 1 !important;
+            font-weight: 700;
         }
 
         .hero {
@@ -209,6 +258,28 @@ def inject_styles() -> None:
             margin: -.55rem 0 .7rem;
         }
 
+        .field-label {
+            background: #ffffff;
+            border: 1px solid var(--line);
+            border-bottom: 0;
+            border-radius: 8px 8px 0 0;
+            padding: .7rem .85rem .55rem;
+        }
+
+        .field-label strong {
+            color: var(--ink);
+            display: block;
+            font-size: .95rem;
+            margin-bottom: .2rem;
+        }
+
+        .field-label span {
+            color: var(--muted);
+            display: block;
+            font-size: .8rem;
+            line-height: 1.35;
+        }
+
         @media (max-width: 900px) {
             .metric-strip {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -300,15 +371,28 @@ def format_value(value: float) -> str:
 def numeric_input_for_feature(df: pd.DataFrame, feature: str) -> float:
     low, high, median = feature_bounds(df, feature)
     description = FEATURE_DESCRIPTIONS.get(feature, feature.replace("_", " ").title())
-    label = f"{description} | dataset column: {feature}"
+    guidance = FEATURE_GUIDANCE.get(feature, "Enter the value from the CTG record.")
     is_integer = np.all(np.isclose(df[feature], df[feature].round()))
     step = 1.0 if is_integer else 0.001
+    st.markdown(
+        f"""
+        <div class="field-label">
+            <strong>{description}</strong>
+            <span>{guidance}</span>
+            <span>Column: <code>{feature}</code> | allowed range:
+            {format_value(low)} to {format_value(high)} | usual median:
+            {format_value(median)}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     value = st.number_input(
-        label,
+        description,
         min_value=low,
         max_value=high,
         value=median,
         step=step,
+        label_visibility="collapsed",
         help=(
             f"Allowed range from the training dataset: "
             f"{format_value(low)} to {format_value(high)}. "
