@@ -570,59 +570,43 @@ def render_dashboard(df: pd.DataFrame, bundle: ModelBundle) -> None:
 def render_prediction_form(df: pd.DataFrame, bundle: ModelBundle) -> None:
     st.title("New Patient Assessment")
     st.caption(
-        "Enter CTG-derived values from the patient record. Every field shows the dataset column name, "
-        "allowed range, and median default."
+        "Enter the main CTG values from the patient record. Advanced statistical fields are filled "
+        "with dataset median values unless you choose to edit them."
     )
 
     with st.form("ctg_assessment_form"):
-        tab_core, tab_variability, tab_histogram = st.tabs(
-            ["Core CTG", "Variability", "Histogram"]
-        )
+        values: dict[str, float] = {
+            feature: feature_bounds(df, feature)[2] for feature in bundle.feature_names
+        }
 
-        values: dict[str, float] = {}
-        with tab_core:
-            cols = st.columns(2)
-            core_features = [
-                "baseline value",
-                "accelerations",
-                "fetal_movement",
-                "uterine_contractions",
-                "light_decelerations",
-                "severe_decelerations",
-                "prolongued_decelerations",
-            ]
-            for index, feature in enumerate(core_features):
-                with cols[index % 2]:
-                    values[feature] = numeric_input_for_feature(df, feature)
+        st.markdown("**Quick CTG inputs**")
+        st.caption("These are the easiest values to explain in your presentation and demo.")
+        quick_features = [
+            "baseline value",
+            "accelerations",
+            "fetal_movement",
+            "uterine_contractions",
+            "light_decelerations",
+            "severe_decelerations",
+            "prolongued_decelerations",
+            "abnormal_short_term_variability",
+            "mean_value_of_short_term_variability",
+        ]
+        cols = st.columns(2)
+        for index, feature in enumerate(quick_features):
+            with cols[index % 2]:
+                values[feature] = numeric_input_for_feature(df, feature)
 
-        with tab_variability:
-            cols = st.columns(2)
-            variability_features = [
-                "abnormal_short_term_variability",
-                "mean_value_of_short_term_variability",
-                "percentage_of_time_with_abnormal_long_term_variability",
-                "mean_value_of_long_term_variability",
+        with st.expander("Advanced CTG statistics"):
+            st.caption(
+                "Optional fields used by the trained model. Leave them as median values for a simpler demo."
+            )
+            advanced_features = [
+                feature for feature in bundle.feature_names if feature not in quick_features
             ]
-            for index, feature in enumerate(variability_features):
-                with cols[index % 2]:
-                    values[feature] = numeric_input_for_feature(df, feature)
-
-        with tab_histogram:
-            cols = st.columns(2)
-            histogram_features = [
-                "histogram_width",
-                "histogram_min",
-                "histogram_max",
-                "histogram_number_of_peaks",
-                "histogram_number_of_zeroes",
-                "histogram_mode",
-                "histogram_mean",
-                "histogram_median",
-                "histogram_variance",
-                "histogram_tendency",
-            ]
-            for index, feature in enumerate(histogram_features):
-                with cols[index % 2]:
+            advanced_cols = st.columns(2)
+            for index, feature in enumerate(advanced_features):
+                with advanced_cols[index % 2]:
                     values[feature] = numeric_input_for_feature(df, feature)
 
         submitted = st.form_submit_button("Assess fetal health", use_container_width=True)
